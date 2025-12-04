@@ -236,6 +236,11 @@
         </div>
 
         <div class="card">
+            <span class="section-title">0. Defect Worker ID (指摘工號/人員)</span>
+            <input type="text" id="workerIdInput" class="modal-input" placeholder="Enter Worker ID (請輸入工號)">
+        </div>
+
+        <div class="card">
             <span class="section-title">1. Photo (圖片紀錄)</span>
             <div class="photo-controls">
                 <button class="btn-half btn-cam" onclick="triggerCam()">📷 Camera (拍照)</button>
@@ -274,6 +279,11 @@
                 <div style="text-align: right; font-size: 0.9em; color: #555; margin-top: 8px; font-weight: bold;">
                     Time left: <span id="display-timeout" style="color:#d63384; font-size:1.1em;">10</span> s
                 </div>
+            </div>
+
+            <div class="footer-btns" style="margin-top: 15px; padding-bottom: 0; flex-direction: row;">
+                <button class="btn-main btn-half" style="background-color: #008CBA; font-size: 14px; padding: 12px;" onclick="copyNote()">📋 複製文字</button>
+                <button class="btn-main btn-half" style="background-color: #f44336; font-size: 14px; padding: 12px;" onclick="copyImage()">🖼️ 複製照片</button>
             </div>
         </div>
 
@@ -337,13 +347,12 @@
     </div>
 
 <script>
-    // ================= 初始化 =================
+    // ================= 初始化 & FIXED PATHS (已修正 Sheet ID 格式) =================
     const DEFAULT_PASS = "1234"; 
     
-    // --- 這裡是你要求的寫死路徑 (FIXED PATHS) ---
-    // 我已經將你提供的連結轉換成對應的 ID 並固定於此。
-    const FIXED_SCRIPT_ID = "AKfycbwFOhOMBmkM-zyjQ_8bqfBQvNGsb5pbdH1DYC--lzXMmfNhJGHFWMxR5BFPm6acUk_I/exec";
-    const FIXED_SHEET_ID = "1LkRGvju345Ve8R1WemsErdmC-KP1rxfHy_b7nvnJLZE/edit?gid=0#gid=0";
+    const FIXED_SCRIPT_ID = "AKfycbwFOhOMBmkM-zyjQ_8bqfBQvNGsb5pbdH1DYC--lzXMmfNhJGHFWMxR5BFPm6acUk_I";
+    // ★★★ 修正點：Sheet ID 僅保留純 ID，移除後綴的 /edit?gid=0#gid=0 ★★★
+    const FIXED_SHEET_ID = "1LkRGvju345Ve8R1WemsErdmC-KP1rxfHy_b7nvnJLZE"; 
     const FIXED_FOLDER_ID = "1JiECr4vcpnJoroXW6aHLXWfWk41_B0Jp";
 
     let processedImageBase64 = ""; 
@@ -352,8 +361,8 @@
     // 錄音狀態
     let isRecording = false; 
     let isManualStop = false; 
-    let voiceTimer = null;          
-    let countdownInterval = null;   
+    let voiceTimer = null; 
+    let countdownInterval = null; 
     let punctuationTimer = null; 
     let timeLeft = 0; 
     let snapshotText = ""; 
@@ -417,25 +426,6 @@
             document.getElementById('main-lang').value = val;
         }
         localStorage.setItem("cfg_lang", val);
-    }
-
-    // 雖然現在寫死了，但保留此函數以防未來需要
-    function extractId(input) {
-        if (!input) return "";
-        input = input.trim();
-        if (input.includes("script.google.com")) {
-            const match = input.match(/\/s\/([a-zA-Z0-9-_]+)\/exec/);
-            return match ? match[1] : input;
-        }
-        if (input.includes("docs.google.com")) {
-            const match = input.match(/\/d\/([a-zA-Z0-9-_]+)/);
-            return match ? match[1] : input;
-        }
-        if (input.includes("drive.google.com")) {
-            const match = input.match(/\/folders\/([a-zA-Z0-9-_]+)/);
-            return match ? match[1] : input;
-        }
-        return input;
     }
 
     function saveSettings() {
@@ -553,7 +543,7 @@
         }
     }
 
-    // ================= 語音功能 (修正：標點遺失問題) =================
+    // ================= 語音功能 =================
     function toggleVoice() {
         if (!('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
             alert("Browser not supported"); return;
@@ -637,7 +627,7 @@
             }
         };
 
-        // 5. 強制不中斷 & 自動重啟邏輯 (含補標點)
+        // 強制不中斷 & 自動重啟邏輯 (含補標點)
         recognition.onend = function() {
             if(punctuationTimer) clearTimeout(punctuationTimer);
 
@@ -694,7 +684,52 @@
         document.getElementById('display-timeout').innerText = originalTime;
     }
 
-    // ================= 上傳與檢視 =================
+    // ================= 新增：複製功能 (Note & Image) =================
+
+    function copyNote() {
+        const note = document.getElementById('noteInput').value;
+        if (note.trim() === "") {
+            alert("Note is empty! (文字內容為空)");
+            return;
+        }
+        navigator.clipboard.writeText(note)
+            .then(() => {
+                showStatus('success', 'Note Copied!', '文字內容已複製到剪貼簿。');
+                setTimeout(() => { closeStatusModal(); }, 1500);
+            })
+            .catch(err => {
+                alert('Copy failed: ' + err + ' (請允許剪貼簿存取)');
+            });
+    }
+
+    function copyImage() {
+        if (!processedImageBase64) {
+            alert("No photo to copy! (沒有照片可以複製)");
+            return;
+        }
+        
+        fetch(processedImageBase64)
+            .then(res => res.blob())
+            .then(blob => {
+                try {
+                    const item = new ClipboardItem({ [blob.type]: blob });
+                    navigator.clipboard.write([item])
+                        .then(() => {
+                            showStatus('success', 'Photo Copied!', '照片已複製到剪貼簿！');
+                            setTimeout(() => { closeStatusModal(); }, 2000);
+                        })
+                        .catch(err => {
+                            showStatus('error', 'Copy Failed', '照片複製失敗，瀏覽器不支援此功能。');
+                            document.getElementById('status-close-btn').style.display = 'block';
+                        });
+                } catch (e) {
+                    showStatus('error', 'Copy Failed', '無法使用 ClipboardItem API，請使用最新版本 Chrome/Edge。');
+                    document.getElementById('status-close-btn').style.display = 'block';
+                }
+            });
+    }
+
+    // ================= 上傳與檢視 (已更新 saveToCloud 傳送 workerId) =================
     function showStatus(type, title, subtitle) {
         const modal = document.getElementById('status-modal');
         const spinner = document.getElementById('status-spinner');
@@ -719,22 +754,25 @@
 
     function saveToCloud() {
         const note = document.getElementById('noteInput').value;
+        const workerId = document.getElementById('workerIdInput').value; // ★★★ 新增：取得指摘工號 ★★★
         
-        // --- 使用寫死的 Folder ID ---
         const folderId = FIXED_FOLDER_ID;
-        
-        // --- 使用寫死的 Script ID ---
         const scriptUrl = `https://script.google.com/macros/s/${FIXED_SCRIPT_ID}/exec`;
 
-        if(!processedImageBase64 && !note) {
-            alert("Empty! Please take a photo or write a note."); return;
+        if(!processedImageBase64 && !note && !workerId) {
+            alert("Empty! Please take a photo, write a note, or enter Worker ID."); return;
         }
 
         const btn = document.getElementById('saveBtn');
         btn.disabled = true;
         showStatus('loading', 'Uploading...', '資料上傳中...');
 
-        const data = { note: note, image: processedImageBase64, folderId: folderId };
+        const data = { 
+            note: note, 
+            image: processedImageBase64, 
+            folderId: folderId,
+            workerId: workerId // ★★★ 更新：傳送指摘工號 ★★★
+        };
 
         fetch(scriptUrl, {
             method: 'POST',
@@ -744,6 +782,7 @@
         .then(res => {
             showStatus('success', 'Upload Success!', '上傳成功！');
             document.getElementById('noteInput').value = "";
+            document.getElementById('workerIdInput').value = ""; // 清空工號
             processedImageBase64 = "";
             document.getElementById('preview-img').style.display = 'none';
             document.querySelector('.placeholder').style.display = 'block';
@@ -760,18 +799,16 @@
     }
 
     function viewExcel() {
-        // --- 使用寫死的 Sheet ID ---
+        // ★★★ 修正點：直接使用 FIXED_SHEET_ID，不用再加 /edit ★★★
         const url = `https://docs.google.com/spreadsheets/d/${FIXED_SHEET_ID}/edit`;
         window.open(url, '_blank');
     }
 
     function viewDriveFolder() {
-        // --- 使用寫死的 Folder ID ---
         const folderId = FIXED_FOLDER_ID;
         if(folderId && folderId.trim() !== "") {
             window.open("https://drive.google.com/drive/folders/" + folderId, '_blank');
         } else {
-            // Fallback (理論上不會發生，因為已經寫死 ID 了)
             if(confirm("Folder ID not set. Open Google Drive Root?\n(尚未設定資料夾 ID，要開啟雲端硬碟根目錄嗎？)")) {
                 window.open("https://drive.google.com/drive/my-drive", '_blank');
             }
@@ -781,4 +818,3 @@
 
 </body>
 </html>
-
