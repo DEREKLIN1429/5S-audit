@@ -351,14 +351,12 @@
     const DEFAULT_PASS = "1234"; 
     
     const FIXED_SCRIPT_ID = "AKfycbwFOhOMBmkM-zyjQ_8bqfBQvNGsb5pbdH1DYC--lzXMmfNhJGHFWMxR5BFPm6acUk_I";
-    // ★★★ 修正點：Sheet ID 僅保留純 ID，移除後綴的 /edit?gid=0#gid=0 ★★★
     const FIXED_SHEET_ID = "1LkRGvju345Ve8R1WemsErdmC-KP1rxfHy_b7nvnJLZE"; 
     const FIXED_FOLDER_ID = "1JiECr4vcpnJoroXW6aHLXWfWk41_B0Jp";
 
     let processedImageBase64 = ""; 
     let recognition;
     
-    // 錄音狀態
     let isRecording = false; 
     let isManualStop = false; 
     let voiceTimer = null; 
@@ -568,7 +566,6 @@
         document.getElementById('voiceBtn').classList.add('recording');
         document.getElementById('voiceBtn').innerText = "🛑 Stop";
         
-        // 建立快照
         snapshotText = document.getElementById('noteInput').value;
         if(snapshotText.length > 0 && !snapshotText.endsWith(" ")) {
             snapshotText += " ";
@@ -621,18 +618,15 @@
             
             if(currentSessionText.trim().length > 0) {
                 punctuationTimer = setTimeout(() => {
-                    // 計時器觸發：停頓1秒後切斷
                     recognition.stop(); 
                 }, 1000);
             }
         };
 
-        // 強制不中斷 & 自動重啟邏輯 (含補標點)
         recognition.onend = function() {
             if(punctuationTimer) clearTimeout(punctuationTimer);
 
             if (isRecording && !isManualStop && timeLeft > 0) {
-                // 檢查是否需要補標點
                 let currentVal = document.getElementById('noteInput').value.trim();
                 if(currentVal.length > 0) {
                     const lastChar = currentVal.slice(-1);
@@ -645,7 +639,6 @@
                     }
                 }
 
-                // 更新快照
                 snapshotText = document.getElementById('noteInput').value;
                 if(snapshotText.length > 0 && !snapshotText.endsWith(" ")) {
                     snapshotText += " "; 
@@ -684,7 +677,7 @@
         document.getElementById('display-timeout').innerText = originalTime;
     }
 
-    // ================= 新增：複製功能 (Note & Image) =================
+    // ================= 複製功能 (已修復複製失敗問題，加入下載備用方案) =================
 
     function copyNote() {
         const note = document.getElementById('noteInput').value;
@@ -702,6 +695,25 @@
             });
     }
 
+    function downloadImageFallback(blob) {
+        // 建立一個隱藏的 A 標籤來觸發下載
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        
+        // 設置下載的文件名
+        a.download = '5S_Audit_Photo_' + new Date().getTime() + '.jpg';
+        a.style.display = 'none';
+        
+        document.body.appendChild(a);
+        a.click(); // 模擬點擊下載
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url); // 清理 Blob URL
+
+        showStatus('success', 'Download Started', '照片已自動開始下載。');
+        setTimeout(() => { closeStatusModal(); }, 2000);
+    }
+
     function copyImage() {
         if (!processedImageBase64) {
             alert("No photo to copy! (沒有照片可以複製)");
@@ -711,7 +723,8 @@
         fetch(processedImageBase64)
             .then(res => res.blob())
             .then(blob => {
-                try {
+                const copyTry = () => {
+                    // 嘗試使用現代 Clipboard API 複製圖片 (最理想的方式)
                     const item = new ClipboardItem({ [blob.type]: blob });
                     navigator.clipboard.write([item])
                         .then(() => {
@@ -719,17 +732,24 @@
                             setTimeout(() => { closeStatusModal(); }, 2000);
                         })
                         .catch(err => {
-                            showStatus('error', 'Copy Failed', '照片複製失敗，瀏覽器不支援此功能。');
-                            document.getElementById('status-close-btn').style.display = 'block';
+                            console.error("Clipboard Copy failed:", err);
+                            // 如果複製失敗，則執行備用下載方案
+                            downloadImageFallback(blob);
                         });
-                } catch (e) {
-                    showStatus('error', 'Copy Failed', '無法使用 ClipboardItem API，請使用最新版本 Chrome/Edge。');
-                    document.getElementById('status-close-btn').style.display = 'block';
+                };
+
+                // 檢查瀏覽器是否支援 ClipboardItem (解決直接在本地運行 file:// 的問題)
+                if (window.ClipboardItem && location.protocol.includes('http')) {
+                    copyTry();
+                } else {
+                    // 如果不支援或不是安全連線，直接執行備用下載方案
+                    console.warn("ClipboardItem not fully supported or not secure context. Falling back to download.");
+                    downloadImageFallback(blob);
                 }
             });
     }
 
-    // ================= 上傳與檢視 (已更新 saveToCloud 傳送 workerId) =================
+    // ================= 上傳與檢視 =================
     function showStatus(type, title, subtitle) {
         const modal = document.getElementById('status-modal');
         const spinner = document.getElementById('status-spinner');
@@ -754,7 +774,7 @@
 
     function saveToCloud() {
         const note = document.getElementById('noteInput').value;
-        const workerId = document.getElementById('workerIdInput').value; // ★★★ 新增：取得指摘工號 ★★★
+        const workerId = document.getElementById('workerIdInput').value; 
         
         const folderId = FIXED_FOLDER_ID;
         const scriptUrl = `https://script.google.com/macros/s/${FIXED_SCRIPT_ID}/exec`;
@@ -771,7 +791,7 @@
             note: note, 
             image: processedImageBase64, 
             folderId: folderId,
-            workerId: workerId // ★★★ 更新：傳送指摘工號 ★★★
+            workerId: workerId 
         };
 
         fetch(scriptUrl, {
@@ -782,7 +802,7 @@
         .then(res => {
             showStatus('success', 'Upload Success!', '上傳成功！');
             document.getElementById('noteInput').value = "";
-            document.getElementById('workerIdInput').value = ""; // 清空工號
+            document.getElementById('workerIdInput').value = ""; 
             processedImageBase64 = "";
             document.getElementById('preview-img').style.display = 'none';
             document.querySelector('.placeholder').style.display = 'block';
@@ -799,7 +819,6 @@
     }
 
     function viewExcel() {
-        // ★★★ 修正點：直接使用 FIXED_SHEET_ID，不用再加 /edit ★★★
         const url = `https://docs.google.com/spreadsheets/d/${FIXED_SHEET_ID}/edit`;
         window.open(url, '_blank');
     }
