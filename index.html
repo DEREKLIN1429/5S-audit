@@ -357,7 +357,7 @@
     </div>
 
 <script>
-    // ================= 初始化 & FIXED PATHS (已修正 Sheet ID 格式) =================
+    // ================= 初始化 & FIXED PATHS =================
     const DEFAULT_PASS = "1234"; 
     
     const FIXED_SCRIPT_ID = "AKfycbwFOhOMBmkM-zyjQ_8bqfBQvNGsb5pbdH1DYC--lzXMmfNhJGHFWMxR5BFPm6acUk_I";
@@ -717,8 +717,9 @@
         }
         navigator.clipboard.writeText(note)
             .then(() => {
-                showStatus('success', 'Note Copied!', '文字內容已複製到剪貼簿。');
-                setTimeout(() => { closeStatusModal(); }, 1500);
+                // ★★★ 優化後的提示訊息 ★★★
+                showStatus('success', 'Copied!', '文字內容已複製到剪貼簿。您可以直接貼上或分享。');
+                setTimeout(() => { closeStatusModal(); }, 1800);
             })
             .catch(err => {
                 alert('Copy failed: ' + err + ' (請允許剪貼簿存取)');
