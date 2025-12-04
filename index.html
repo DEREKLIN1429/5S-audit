@@ -224,6 +224,16 @@
         </div>
     </div>
 
+    <div id="screenshot-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 3000; justify-content: center; align-items: center;">
+        <div style="background: white; padding: 20px; border-radius: 10px; width: 90%; max-width: 450px; text-align: center;">
+            <h3 style="color:#007bff; margin-top:0;">📸 截圖/分享</h3>
+            <p style="font-size: 0.9em; color:#666;">(請長按下方圖片或使用手機截圖功能儲存)</p>
+            <img id="screenshot-display" style="max-width: 100%; height: auto; border: 4px solid #f0fff0; box-shadow: 0 0 10px rgba(0, 230, 0, 0.8); margin-bottom: 15px; border-radius: 8px;">
+            <button class="btn-main btn-view" style="background-color: #6c757d;" onclick="closeScreenshotModal()">關閉</button>
+        </div>
+    </div>
+
+
     <div id="app-screen">
         <div class="author-header">Author: DERER LIN</div>
 
@@ -269,7 +279,7 @@
                         <option value="cmn-Hant-TW">中文 (繁體)</option>
                         <option value="en-US">English</option>
                         <option value="ja-JP">日本語</option>
-                        <option value="hi-IN">हिन्दी (Hindi)</option>
+                        <option value="hi-IN">Hindi (印地語)</option>
                     </select>
                 </div>
 
@@ -283,7 +293,7 @@
 
             <div class="footer-btns" style="margin-top: 15px; padding-bottom: 0; flex-direction: row;">
                 <button class="btn-main btn-half" style="background-color: #008CBA; font-size: 14px; padding: 12px;" onclick="copyNote()">📋 複製文字</button>
-                <button class="btn-main btn-half" style="background-color: #f44336; font-size: 14px; padding: 12px;" onclick="copyImage()">🖼️ 複製照片</button>
+                <button class="btn-main btn-half" style="background-color: #ffc107; color:#333; font-size: 14px; padding: 12px;" onclick="captureScreenArea()">📸 截圖分享</button>
             </div>
         </div>
 
@@ -677,8 +687,28 @@
         document.getElementById('display-timeout').innerText = originalTime;
     }
 
-    // ================= 複製功能 (已修復複製失敗問題，加入下載備用方案) =================
+    // ================= 複製/截圖功能 (已修改為截圖顯示) =================
 
+    function closeScreenshotModal() {
+        document.getElementById('screenshot-modal').style.display = 'none';
+    }
+
+    function captureScreenArea() {
+        if (!processedImageBase64) {
+            alert("No photo to capture! (沒有照片可以截圖)");
+            return;
+        }
+
+        const modal = document.getElementById('screenshot-modal');
+        const displayImg = document.getElementById('screenshot-display');
+
+        // 顯示處理好的圖片 (已經是裁剪和壓縮過的 Base64 數據)
+        displayImg.src = processedImageBase64;
+        
+        // 顯示截圖分享彈窗
+        modal.style.display = 'flex';
+    }
+    
     function copyNote() {
         const note = document.getElementById('noteInput').value;
         if (note.trim() === "") {
@@ -692,60 +722,6 @@
             })
             .catch(err => {
                 alert('Copy failed: ' + err + ' (請允許剪貼簿存取)');
-            });
-    }
-
-    function downloadImageFallback(blob) {
-        // 建立一個隱藏的 A 標籤來觸發下載
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        
-        // 設置下載的文件名
-        a.download = '5S_Audit_Photo_' + new Date().getTime() + '.jpg';
-        a.style.display = 'none';
-        
-        document.body.appendChild(a);
-        a.click(); // 模擬點擊下載
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url); // 清理 Blob URL
-
-        showStatus('success', 'Download Started', '照片已自動開始下載。');
-        setTimeout(() => { closeStatusModal(); }, 2000);
-    }
-
-    function copyImage() {
-        if (!processedImageBase64) {
-            alert("No photo to copy! (沒有照片可以複製)");
-            return;
-        }
-        
-        fetch(processedImageBase64)
-            .then(res => res.blob())
-            .then(blob => {
-                const copyTry = () => {
-                    // 嘗試使用現代 Clipboard API 複製圖片 (最理想的方式)
-                    const item = new ClipboardItem({ [blob.type]: blob });
-                    navigator.clipboard.write([item])
-                        .then(() => {
-                            showStatus('success', 'Photo Copied!', '照片已複製到剪貼簿！');
-                            setTimeout(() => { closeStatusModal(); }, 2000);
-                        })
-                        .catch(err => {
-                            console.error("Clipboard Copy failed:", err);
-                            // 如果複製失敗，則執行備用下載方案
-                            downloadImageFallback(blob);
-                        });
-                };
-
-                // 檢查瀏覽器是否支援 ClipboardItem (解決直接在本地運行 file:// 的問題)
-                if (window.ClipboardItem && location.protocol.includes('http')) {
-                    copyTry();
-                } else {
-                    // 如果不支援或不是安全連線，直接執行備用下載方案
-                    console.warn("ClipboardItem not fully supported or not secure context. Falling back to download.");
-                    downloadImageFallback(blob);
-                }
             });
     }
 
